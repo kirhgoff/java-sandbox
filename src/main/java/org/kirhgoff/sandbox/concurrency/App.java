@@ -1,4 +1,4 @@
-package org.kirhgoff;
+package org.kirhgoff.sandbox.concurrency;
 
 /**
  * @author <a href="mailto:kirill.lastovirya@moex.com">Kirill Lastovirya</a>

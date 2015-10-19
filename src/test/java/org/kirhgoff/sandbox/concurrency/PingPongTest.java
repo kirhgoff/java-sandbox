@@ -1,4 +1,4 @@
-package org.kirhgoff;
+package org.kirhgoff.sandbox.concurrency;
 
 import org.testng.annotations.Test;
 
