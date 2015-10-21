@@ -14,12 +14,13 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 public class PingPongTest {
   @Test
   public void testPingPong() throws Exception {
+    checkImplementation(PingPongSynchronized::create);
+  }
+
+  private void checkImplementation(TriFunction<StringBuilder, String, Runnable[]> factory) {
     StringBuilder sb = new StringBuilder();
 
-    Runnable [] runnables = new Runnable[] {
-      new PingPongSynchronized(sb, "Pong\n"),
-      new PingPongSynchronized(sb, "Ping\n")
-    };
+    Runnable[] runnables = factory.apply (sb, "Ping\n", "Pong\n");
 
     List<Thread> threads = Arrays.stream(runnables)
       .map(Thread::new)
@@ -33,8 +34,6 @@ public class PingPongTest {
         e.printStackTrace();
       }
     });
-
-
 
     assertThat(sb.toString()).isEqualTo("Ping\nPong\nPing\nPong\nPing\nPong\n");
   }

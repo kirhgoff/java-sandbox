@@ -3,9 +3,14 @@ package org.kirhgoff.sandbox.concurrency;
 /**
  * @author <a href="mailto:kirill.lastovirya@moex.com">Kirill Lastovirya</a>
  */
-class PingPongSynchronized implements Runnable {
+class PingPongSynchronized implements Runnable{
+  public static String PING;
+  public static String PONG;
 
   public static Runnable [] create (StringBuilder sb, String ping, String pong) {
+    PING = ping;
+    PONG = pong;
+
     return new Runnable [] {new PingPongSynchronized(sb, ping), new PingPongSynchronized(sb, pong)};
   }
 
@@ -23,11 +28,15 @@ class PingPongSynchronized implements Runnable {
     while (counter < 3) {
       try {
         synchronized (sb) {
-          if (text.startsWith("Pong")) {
+          if (text.startsWith(PONG)) {
             while (sb.toString().isEmpty()) {
               System.out.print("Waiting for not " + text);
               sb.wait();
             }
+          }
+          if (text.startsWith(PING) && counter == 2) {
+            System.out.print("We are going to wake the last one " + text);
+            sb.notifyAll();
           }
         }
 
@@ -42,7 +51,6 @@ class PingPongSynchronized implements Runnable {
         e.printStackTrace();
       }
     }
-    //TODO Pong is does not finish
     System.out.print("Exiting " + text);
   }
 }
