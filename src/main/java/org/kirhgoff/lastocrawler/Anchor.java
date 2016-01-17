@@ -1,13 +1,24 @@
 package org.kirhgoff.lastocrawler;
 
+import java.util.*;
+
 /**
  * Created by khrapusha on 17/01/16.
  */
 public class Anchor {
   private String url;
+  private Set<Anchor> referencedBy = new HashSet<>();
 
   public Anchor(String url) {
     this.url = url;
+  }
+
+  /**
+   * Reference to me from other page
+   * @param other
+   */
+  public void addReference (Anchor other) {
+    referencedBy.add(other);
   }
 
   @Override
@@ -35,5 +46,9 @@ public class Anchor {
 
   public String getUrl() {
     return url;
+  }
+
+  public Set<Anchor> getReferences() {
+    return referencedBy;
   }
 }

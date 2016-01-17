@@ -25,8 +25,9 @@ public class Crawler {
   private final URL startUrl;
   private final BlockingQueue<Anchor> queue = new LinkedBlockingQueue<>();
   private final Set<Anchor> processed = new HashSet<>();
+
   private final Set<String> wontProcess = new HashSet<>();
-  private final Map<Anchor, String> brokenLinkSource = new HashMap<>();
+  private final Set<Anchor> brokenLinkSource = new HashSet<>();
 
   private static final List<String> stopWords = Arrays.asList(
       "http", "mailto", "javascript", "#"
@@ -46,13 +47,15 @@ public class Crawler {
   private void go() throws IOException, InterruptedException {
     Anchor root = new Anchor(startUrl.toString());
     queue.add(root);
-    while(!queue.isEmpty()) {
+    while (!queue.isEmpty()) {
       Anchor current = queue.take();
-      String pageContents = readUrl(current.getUrl(), current);
       processed.add(current);
 
+      String pageContents = readUrl(current);
       List<String> urls = parseAndFindAnchors(pageContents);
+
       urls.stream().forEach(u -> processUrl(u, current));
+
       System.out.println("Queue " + queue.size() + ", processed " + processed.size());
     }
   }
@@ -72,7 +75,22 @@ public class Crawler {
     if (newAnchor != null) {
       if (!processed.contains(newAnchor) && !queue.contains(newAnchor)) {
         queue.add(newAnchor);
+      } else {
+        updateReferences(newAnchor, source);
       }
+    }
+  }
+
+  private void updateReferences(Anchor newAnchor, Anchor source) {
+    updateReference(newAnchor, source, processed);
+    updateReference(newAnchor, source, queue);
+    updateReference(newAnchor, source, brokenLinkSource);
+  }
+
+  private void updateReference(Anchor anchor, Anchor referencedBy, Collection<Anchor> processed) {
+    Optional<Anchor> option = processed.stream().filter(a -> a.equals(anchor)).findAny();
+    if (option.isPresent()) {
+      option.get().addReference(referencedBy);
     }
   }
 
@@ -81,7 +99,9 @@ public class Crawler {
       URL url = new URL(urlString);
       url.openConnection();
     } catch (Exception e) {
-      brokenLinkSource.put(source, urlString);
+      Anchor temp = new Anchor(urlString);
+      temp.addReference(source);
+      brokenLinkSource.add(temp);
     }
   }
 
@@ -99,7 +119,7 @@ public class Crawler {
   private String normalize(String urlString) {
     if (urlString.startsWith("/")) {
       urlString = startUrl.getProtocol() + "://" + startUrl.getHost() + urlString;
-    } else if (!stopWords.stream().filter(urlString::startsWith).findAny().isPresent()){
+    } else if (!stopWords.stream().filter(urlString::startsWith).findAny().isPresent()) {
       urlString = startUrl.getProtocol() + "://" + startUrl.getHost() + "/" + urlString;
     }
 
@@ -120,8 +140,8 @@ public class Crawler {
     return result;
   }
 
-  private String readUrl(String urlString, Anchor source) throws MalformedURLException {
-    URL url = new URL(urlString);
+  private String readUrl(Anchor anchor) throws MalformedURLException {
+    URL url = new URL(anchor.getUrl());
 
     StringBuilder sb = new StringBuilder();
     try (BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()))) {
@@ -129,22 +149,25 @@ public class Crawler {
       while ((inputLine = in.readLine()) != null)
         sb.append(inputLine);
     } catch (IOException e) {
-      System.out.println("Broken link: " + urlString);
-      brokenLinkSource.put(source, urlString);
+      System.out.println("Broken link: " + anchor.getUrl());
+      brokenLinkSource.add(anchor);
     }
 
     return sb.toString();
   }
 
-  private void generateReport (String fileName) throws IOException {
+  private void generateReport(String fileName) throws IOException {
     StringBuilder sb = new StringBuilder();
     sb.append("Source;BrokenLink\n");
-    brokenLinkSource.entrySet().forEach(entry -> {
-      sb.append(entry.getKey().getUrl())
-          .append(";")
-          .append(entry.getValue())
-          .append("\n");
-    });
+    for (Anchor anchor : brokenLinkSource) {
+      for (Anchor reference : anchor.getReferences()) {
+        sb.append(reference.getUrl())
+            .append(";")
+            .append(anchor.getUrl())
+            .append("\n");
+      }
+    }
+
     FileWriter fileWriter = new FileWriter(fileName);
     String string = sb.toString();
     fileWriter.write(string, 0, string.length());
