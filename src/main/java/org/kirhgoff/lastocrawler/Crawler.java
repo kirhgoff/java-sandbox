@@ -6,10 +6,13 @@ import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
 import java.io.BufferedReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -23,7 +26,7 @@ public class Crawler {
   private final BlockingQueue<Anchor> queue = new LinkedBlockingQueue<>();
   private final Set<Anchor> processed = new HashSet<>();
   private final Set<String> wontProcess = new HashSet<>();
-  private final Set<String> brokenLinks = new HashSet<>();
+  private final Map<Anchor, String> brokenLinkSource = new HashMap<>();
 
   private static final List<String> stopWords = Arrays.asList(
       "http", "mailto", "javascript", "#"
@@ -32,6 +35,7 @@ public class Crawler {
   public static void main(String[] args) throws IOException, InterruptedException {
     Crawler crawler = new Crawler("http://www.anima-pro.ru/");
     crawler.go();
+    crawler.generateReport("/tmp/lastocrawler.csv");
   }
 
   public Crawler(String startUrlString) throws MalformedURLException {
@@ -44,30 +48,40 @@ public class Crawler {
     queue.add(root);
     while(!queue.isEmpty()) {
       Anchor current = queue.take();
-      String pageContents = readUrl(current.getUrl());
+      String pageContents = readUrl(current.getUrl(), current);
       processed.add(current);
 
       List<String> urls = parseAndFindAnchors(pageContents);
-      urls.stream().forEach(this::processUrl);
+      urls.stream().forEach(u -> processUrl(u, current));
       System.out.println("Queue " + queue.size() + ", processed " + processed.size());
     }
   }
 
-  private void processUrl(String url) {
+  private void processUrl(String url, Anchor source) {
     Anchor newAnchor = null;
     url = normalize(url);
     if (isLocalUrl(url)) {
       newAnchor = new Anchor(url);
     } else {
-      wontProcess.add(url);
+      //Outer link
+      if (url.startsWith("http")) {
+        checkAvailability(url, source);
+      }
     }
 
     if (newAnchor != null) {
       if (!processed.contains(newAnchor) && !queue.contains(newAnchor)) {
         queue.add(newAnchor);
       }
-    } else {
-      wontProcess.add(url);
+    }
+  }
+
+  private void checkAvailability(String urlString, Anchor source) {
+    try {
+      URL url = new URL(urlString);
+      url.openConnection();
+    } catch (Exception e) {
+      brokenLinkSource.put(source, urlString);
     }
   }
 
@@ -106,8 +120,8 @@ public class Crawler {
     return result;
   }
 
-  private String readUrl(String startUrl) throws MalformedURLException {
-    URL url = new URL(startUrl);
+  private String readUrl(String urlString, Anchor source) throws MalformedURLException {
+    URL url = new URL(urlString);
 
     StringBuilder sb = new StringBuilder();
     try (BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()))) {
@@ -115,11 +129,27 @@ public class Crawler {
       while ((inputLine = in.readLine()) != null)
         sb.append(inputLine);
     } catch (IOException e) {
-      System.out.println("Broken link: " + startUrl);
-      brokenLinks.add(startUrl);
+      System.out.println("Broken link: " + urlString);
+      brokenLinkSource.put(source, urlString);
     }
 
     return sb.toString();
+  }
+
+  private void generateReport (String fileName) throws IOException {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Source;BrokenLink\n");
+    brokenLinkSource.entrySet().forEach(entry -> {
+      sb.append(entry.getKey().getUrl())
+          .append(";")
+          .append(entry.getValue())
+          .append("\n");
+    });
+    FileWriter fileWriter = new FileWriter(fileName);
+    String string = sb.toString();
+    fileWriter.write(string, 0, string.length());
+    fileWriter.flush();
+    fileWriter.close();
   }
 
 }
