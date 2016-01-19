@@ -1,35 +1,29 @@
 package org.kirhgoff.lastocrawler;
 
-import java.util.*;
-
 /**
  * Created by khrapusha on 17/01/16.
  */
 public class Anchor {
   private String url;
-  private Set<Anchor> referencedBy = new HashSet<>();
+  private boolean isExternal;
+  private boolean isBroken = false;
 
   public Anchor(String url) {
     this.url = url;
+    this.isExternal = false;
   }
 
-  /**
-   * Reference to me from other page
-   * @param other
-   */
-  public void addReference (Anchor other) {
-    referencedBy.add(other);
+  public Anchor(String url, boolean isExternal) {
+    this.url = url;
+    this.isExternal = isExternal;
   }
 
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-
     Anchor anchor = (Anchor) o;
-
     return url != null ? url.equals(anchor.url) : anchor.url == null;
-
   }
 
   @Override
@@ -48,7 +42,15 @@ public class Anchor {
     return url;
   }
 
-  public Set<Anchor> getReferences() {
-    return referencedBy;
+  public void setIsBroken(boolean isBroken) {
+    this.isBroken = isBroken;
+  }
+
+  public boolean isBroken() {
+    return isBroken;
+  }
+
+  public boolean isExternal() {
+    return isExternal;
   }
 }

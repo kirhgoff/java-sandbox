@@ -12,10 +12,17 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
  * @author <a href="mailto:kirill.lastovirya@moex.com">Kirill Lastovirya</a>
  */
 public class PingPongTest {
+
   @Test
-  public void testPingPong() throws Exception {
+  public void testPingPongSynchronized() throws Exception {
     checkImplementation(PingPongSynchronized::create);
   }
+
+  @Test
+  public void testPingPongLocks() throws Exception {
+    checkImplementation(PingPongLocks::create);
+  }
+
 
   private void checkImplementation(TriFunction<StringBuilder, String, Runnable[]> factory) {
     StringBuilder sb = new StringBuilder();

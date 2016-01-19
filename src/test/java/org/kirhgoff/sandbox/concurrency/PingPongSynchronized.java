@@ -34,10 +34,6 @@ class PingPongSynchronized implements Runnable{
               sb.wait();
             }
           }
-          if (text.startsWith(PING) && counter == 2) {
-            System.out.print("We are going to wake the last one " + text);
-            sb.notifyAll();
-          }
         }
 
         synchronized (sb) {
@@ -49,6 +45,12 @@ class PingPongSynchronized implements Runnable{
         }
       } catch (InterruptedException e) {
         e.printStackTrace();
+      }
+    }
+    if (text.startsWith(PING)) {
+      System.out.print("Notify from " + text);
+      synchronized (sb) {
+        sb.notifyAll();
       }
     }
     System.out.print("Exiting " + text);
