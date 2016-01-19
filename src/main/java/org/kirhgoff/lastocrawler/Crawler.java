@@ -18,13 +18,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Created by Kirill Lastovirya on 17/01/16.
  */
 public class Crawler {
-  private final String secondDomain;
   private final URL startUrl;
 
   //page -> set of referrers
   private final AtomicInteger counter = new AtomicInteger();
   private final ConcurrentMap<Anchor, Set<Anchor>> processed = new ConcurrentHashMap<>();
-  private final ExecutorService executor = Executors.newCachedThreadPool();
+  private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newCachedThreadPool();
 
   private static final List<String> stopWords = Arrays.asList(
       "http", "mailto", "javascript", "#"
@@ -38,26 +37,13 @@ public class Crawler {
 
   public Crawler(String startUrlString) throws MalformedURLException {
     this.startUrl = new URL(startUrlString);
-    this.secondDomain = startUrl.getHost().substring("www.".length());
-//    ((ThreadPoolExecutor)executor).setRejectedExecutionHandler((r, exec) -> {
-//      try {
-//        exec.getQueue().put(r);
-//      } catch (InterruptedException e) {
-//        throw new RuntimeException("Interrupted while submitting task", e);
-//      }
-//    });
   }
 
   private void go() throws IOException, InterruptedException {
-    try {
-      Anchor root = new Anchor(startUrl.toString());
-      executor.execute(new CrawlerTask(root));
-      //TODO
-    } finally {
-//      executor.shutdown();
-//      executor.awaitTermination(5, TimeUnit.MINUTES);
+    executor.execute(new CrawlerTask(new Anchor(startUrl.toString())));
+    while (executor.getActiveCount() != 0) {
+      Thread.sleep(5000);
     }
-    Thread.sleep(10000);
   }
 
   private void generateReport(String fileName) throws IOException {
@@ -81,6 +67,8 @@ public class Crawler {
     fileWriter.write(string, 0, string.length());
     fileWriter.flush();
     fileWriter.close();
+
+    System.out.println("Created report:" + fileName);
   }
 
   private class CrawlerTask implements Runnable {
@@ -93,10 +81,8 @@ public class Crawler {
 
     @Override
     public void run() {
-      System.out.println("Running task number " + counter.incrementAndGet());
+      System.out.println(counter.incrementAndGet() + " running task " + anchor.getUrl());
       try {
-        if (processed.containsKey(anchor)) return;
-
         url = new URL(anchor.getUrl());
         url.openConnection();
 
@@ -110,12 +96,12 @@ public class Crawler {
           processed.compute(childAnchor, (k, v) -> {
             if (v == null) {
               v = new HashSet<>();
+              //Not really atomic, could create duplicate tasks
+              executor.execute(new CrawlerTask(childAnchor));
             }
             v.add(anchor);
             return v;
           });
-          //Not really atomic, could create duplicate tasks
-          executor.execute(new CrawlerTask(childAnchor));
         }
       } catch (IOException e) {
         anchor.setIsBroken(true);
@@ -149,12 +135,9 @@ public class Crawler {
       if (urlString.startsWith("/")) {
         urlString = referrer.getProtocol() + "://" + referrer.getHost() + urlString;
       } else if (!startsFromStopWord(urlString)) {
-        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + referrer.getPath() + "/" + urlString;
+        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + referrer.getPath().replaceFirst("/", "") + urlString;
       }
 
-      if (urlString.contains(startUrl.getHost())) {
-        urlString = urlString.replace(secondDomain, startUrl.getHost());
-      }
       return urlString;
     }
 
@@ -163,7 +146,7 @@ public class Crawler {
     }
 
     private boolean isExternal(String childUrl, URL url) {
-      return childUrl.contains(url.getHost());
+      return !childUrl.contains(url.getHost());
     }
   }
 
