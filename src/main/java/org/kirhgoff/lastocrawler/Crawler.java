@@ -11,10 +11,8 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by Kirill Lastovirya on 17/01/16.
@@ -24,6 +22,7 @@ public class Crawler {
   private final URL startUrl;
 
   //page -> set of referrers
+  private final AtomicInteger counter = new AtomicInteger();
   private final ConcurrentMap<Anchor, Set<Anchor>> processed = new ConcurrentHashMap<>();
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -40,6 +39,13 @@ public class Crawler {
   public Crawler(String startUrlString) throws MalformedURLException {
     this.startUrl = new URL(startUrlString);
     this.secondDomain = startUrl.getHost().substring("www.".length());
+//    ((ThreadPoolExecutor)executor).setRejectedExecutionHandler((r, exec) -> {
+//      try {
+//        exec.getQueue().put(r);
+//      } catch (InterruptedException e) {
+//        throw new RuntimeException("Interrupted while submitting task", e);
+//      }
+//    });
   }
 
   private void go() throws IOException, InterruptedException {
@@ -48,22 +54,27 @@ public class Crawler {
       executor.execute(new CrawlerTask(root));
       //TODO
     } finally {
-      executor.shutdown();
+//      executor.shutdown();
+//      executor.awaitTermination(5, TimeUnit.MINUTES);
     }
-
+    Thread.sleep(10000);
   }
 
   private void generateReport(String fileName) throws IOException {
     StringBuilder sb = new StringBuilder();
     sb.append("Source;BrokenLink\n");
-    for (Anchor anchor : brokenLinkSource) {
-      for (Anchor reference : anchor.getReferences()) {
-        sb.append(reference.getUrl())
+    processed.entrySet().forEach(entry -> {
+      Anchor anchor = entry.getKey();
+      Set<Anchor> referrers = entry.getValue();
+      if (anchor.isBroken()) {
+        for (Anchor reference : referrers) {
+          sb.append(reference.getUrl())
             .append(";")
             .append(anchor.getUrl())
             .append("\n");
-      }
-    }
+        }
+        }
+    });
 
     FileWriter fileWriter = new FileWriter(fileName);
     String string = sb.toString();
@@ -82,7 +93,10 @@ public class Crawler {
 
     @Override
     public void run() {
+      System.out.println("Running task number " + counter.incrementAndGet());
       try {
+        if (processed.containsKey(anchor)) return;
+
         url = new URL(anchor.getUrl());
         url.openConnection();
 
@@ -100,10 +114,13 @@ public class Crawler {
             v.add(anchor);
             return v;
           });
+          //Not really atomic, could create duplicate tasks
           executor.execute(new CrawlerTask(childAnchor));
         }
       } catch (IOException e) {
         anchor.setIsBroken(true);
+      } finally {
+        counter.decrementAndGet();
       }
     }
 
