@@ -27,7 +27,7 @@ public class Crawler {
   private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newFixedThreadPool(4);
 
   private static final List<String> stopWords = Arrays.asList(
-      "http", "mailto", "javascript", "#"
+      "mailto", "javascript", "#"
   );
 
   public static void main(String[] args) throws IOException, InterruptedException {
@@ -92,13 +92,15 @@ public class Crawler {
 
         String contents = readUrl(url);
         List<String> urls = parseAndFindAnchors(contents);
+
         for (String childUrl : urls) {
+          if (startsFromStopWord(childUrl)) continue;
           childUrl = normalize(childUrl, url);
           Anchor childAnchor = new Anchor(childUrl, isExternal(childUrl, url));
+
           processed.compute(childAnchor, (k, v) -> {
             if (v == null) {
               v = new HashSet<>();
-              //Not really atomic, could create duplicate tasks
               executor.execute(new CrawlerTask(childAnchor));
             }
             v.add(anchor);
@@ -134,11 +136,14 @@ public class Crawler {
     private String normalize(String urlString, URL referrer) {
       if (urlString.startsWith("/")) {
         urlString = referrer.getProtocol() + "://" + referrer.getHost() + urlString;
-      } else if (!startsFromStopWord(urlString)) {
-        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + referrer.getPath().replaceFirst("/", "") + urlString;
+      } else if (!urlString.startsWith("http")) {
+        String folder = referrer.getPath().replaceFirst("/", "");
+        int indexOf = folder.lastIndexOf("/");
+        folder = folder.substring(0, indexOf + 1);
+        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + folder + urlString;
       }
 
-      return urlString;
+      return urlString.replaceAll(" ", "%20");
     }
 
     private boolean startsFromStopWord(String urlString) {
