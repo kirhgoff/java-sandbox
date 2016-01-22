@@ -33,7 +33,7 @@ public class Crawler {
   public static void main(String[] args) throws IOException, InterruptedException {
     Crawler crawler = new Crawler("http://anima-pro.ru/");
     crawler.go();
-    crawler.generateReport("/tmp/lastocrawler.csv");
+    crawler.generateReport("./lastocrawler.csv");
   }
 
   public Crawler(String startUrlString) throws MalformedURLException {
