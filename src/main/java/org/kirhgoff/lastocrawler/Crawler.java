@@ -11,8 +11,10 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Created by Kirill Lastovirya on 17/01/16.
@@ -21,9 +23,8 @@ public class Crawler {
   private final URL startUrl;
 
   //page -> set of referrers
-  private final AtomicInteger counter = new AtomicInteger();
   private final ConcurrentMap<Anchor, Set<Anchor>> processed = new ConcurrentHashMap<>();
-  private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newCachedThreadPool();
+  private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newFixedThreadPool(4);
 
   private static final List<String> stopWords = Arrays.asList(
       "http", "mailto", "javascript", "#"
@@ -42,8 +43,9 @@ public class Crawler {
   private void go() throws IOException, InterruptedException {
     executor.execute(new CrawlerTask(new Anchor(startUrl.toString())));
     while (executor.getActiveCount() != 0) {
-      Thread.sleep(5000);
+      Thread.sleep(1000);
     }
+    executor.shutdownNow();
   }
 
   private void generateReport(String fileName) throws IOException {
@@ -81,7 +83,7 @@ public class Crawler {
 
     @Override
     public void run() {
-      System.out.println(counter.incrementAndGet() + " running task " + anchor.getUrl());
+      System.out.println(processed.size() + " running task " + anchor.getUrl());
       try {
         url = new URL(anchor.getUrl());
         url.openConnection();
@@ -105,8 +107,6 @@ public class Crawler {
         }
       } catch (IOException e) {
         anchor.setIsBroken(true);
-      } finally {
-        counter.decrementAndGet();
       }
     }
 
