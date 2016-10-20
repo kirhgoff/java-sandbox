@@ -18,7 +18,7 @@ public class PingPongTest {
     checkImplementation(PingPongSynchronized::create);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testPingPongLocks() throws Exception {
     checkImplementation(PingPongLocks::create);
   }
