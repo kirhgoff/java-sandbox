@@ -4,14 +4,17 @@ package org.kirhgoff.sandbox.concurrency;
  * @author <a href="mailto:kirill.lastovirya@moex.com">Kirill Lastovirya</a>
  */
 class PingPongSynchronized implements Runnable{
-  public static String PING;
-  public static String PONG;
+  private static String PING;
+  private static String PONG;
 
   public static Runnable [] create (StringBuilder sb, String ping, String pong) {
     PING = ping;
     PONG = pong;
 
-    return new Runnable [] {new PingPongSynchronized(sb, ping), new PingPongSynchronized(sb, pong)};
+    return new Runnable [] {
+        new PingPongSynchronized(sb, ping),
+        new PingPongSynchronized(sb, pong)
+    };
   }
 
   private final StringBuilder sb;

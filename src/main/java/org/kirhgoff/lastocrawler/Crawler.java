@@ -11,8 +11,10 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Created by Kirill Lastovirya on 17/01/16.
@@ -21,18 +23,17 @@ public class Crawler {
   private final URL startUrl;
 
   //page -> set of referrers
-  private final AtomicInteger counter = new AtomicInteger();
   private final ConcurrentMap<Anchor, Set<Anchor>> processed = new ConcurrentHashMap<>();
-  private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newCachedThreadPool();
+  private final ThreadPoolExecutor executor = (ThreadPoolExecutor)Executors.newFixedThreadPool(4);
 
   private static final List<String> stopWords = Arrays.asList(
-      "http", "mailto", "javascript", "#"
+      "mailto", "javascript", "#"
   );
 
   public static void main(String[] args) throws IOException, InterruptedException {
     Crawler crawler = new Crawler("http://anima-pro.ru/");
     crawler.go();
-    crawler.generateReport("/tmp/lastocrawler.csv");
+    crawler.generateReport("./lastocrawler.csv");
   }
 
   public Crawler(String startUrlString) throws MalformedURLException {
@@ -42,8 +43,9 @@ public class Crawler {
   private void go() throws IOException, InterruptedException {
     executor.execute(new CrawlerTask(new Anchor(startUrl.toString())));
     while (executor.getActiveCount() != 0) {
-      Thread.sleep(5000);
+      Thread.sleep(1000);
     }
+    executor.shutdownNow();
   }
 
   private void generateReport(String fileName) throws IOException {
@@ -81,7 +83,7 @@ public class Crawler {
 
     @Override
     public void run() {
-      System.out.println(counter.incrementAndGet() + " running task " + anchor.getUrl());
+      System.out.println(processed.size() + " running task " + anchor.getUrl());
       try {
         url = new URL(anchor.getUrl());
         url.openConnection();
@@ -90,13 +92,15 @@ public class Crawler {
 
         String contents = readUrl(url);
         List<String> urls = parseAndFindAnchors(contents);
+
         for (String childUrl : urls) {
+          if (startsFromStopWord(childUrl)) continue;
           childUrl = normalize(childUrl, url);
           Anchor childAnchor = new Anchor(childUrl, isExternal(childUrl, url));
+
           processed.compute(childAnchor, (k, v) -> {
             if (v == null) {
               v = new HashSet<>();
-              //Not really atomic, could create duplicate tasks
               executor.execute(new CrawlerTask(childAnchor));
             }
             v.add(anchor);
@@ -105,8 +109,6 @@ public class Crawler {
         }
       } catch (IOException e) {
         anchor.setIsBroken(true);
-      } finally {
-        counter.decrementAndGet();
       }
     }
 
@@ -134,11 +136,14 @@ public class Crawler {
     private String normalize(String urlString, URL referrer) {
       if (urlString.startsWith("/")) {
         urlString = referrer.getProtocol() + "://" + referrer.getHost() + urlString;
-      } else if (!startsFromStopWord(urlString)) {
-        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + referrer.getPath().replaceFirst("/", "") + urlString;
+      } else if (!urlString.startsWith("http")) {
+        String folder = referrer.getPath().replaceFirst("/", "");
+        int indexOf = folder.lastIndexOf("/");
+        folder = folder.substring(0, indexOf + 1);
+        urlString = referrer.getProtocol() + "://" + referrer.getHost() + "/" + folder + urlString;
       }
 
-      return urlString;
+      return urlString.replaceAll(" ", "%20");
     }
 
     private boolean startsFromStopWord(String urlString) {
