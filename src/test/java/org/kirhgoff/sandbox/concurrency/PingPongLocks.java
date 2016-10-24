@@ -50,11 +50,16 @@ public class PingPongLocks implements Runnable{
   public void run() {
     try {
       while (counter < 3) {
-        if (text.startsWith(PONG)) {
-          while (sb.toString().isEmpty()) {
-            System.out.print("Waiting for not " + text);
-            otherCondition.wait();
+        lock.lock();
+        try {
+          if (text.startsWith(PONG)) {
+            while (sb.toString().isEmpty()) {
+              System.out.print("Waiting for not " + text);
+              otherCondition.await();
+            }
           }
+        } finally {
+          lock.unlock();
         }
 
         lock.lock();

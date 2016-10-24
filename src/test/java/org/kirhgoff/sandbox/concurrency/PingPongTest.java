@@ -13,12 +13,12 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
  */
 public class PingPongTest {
 
-  @Test
+  @Test(enabled = false)
   public void testPingPongSynchronized() throws Exception {
     checkImplementation(PingPongSynchronized::create);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testPingPongLocks() throws Exception {
     checkImplementation(PingPongLocks::create);
   }

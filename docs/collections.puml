@@ -1,0 +1,20 @@
+@startuml
+
+AbstractCollection --|> Object
+
+Collection --|> Iterable
+
+Set --|> Collection
+SortedSet --|> Set
+List --|> Collection
+
+ArrayList --|> List
+LinkedList --|> List
+Vector --|> List
+
+HashMap --|> Map
+TreeMap --|> Map
+Hashtable --|> Map
+SortedMap --|> Map
+
+@enduml
