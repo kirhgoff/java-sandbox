@@ -44,7 +44,7 @@ class PingPongSynchronized implements Runnable{
           sb.append(text);
           counter++;
           sb.notifyAll();
-          sb.wait();
+          sb.wait(); // TODO should be in a loop
         }
       } catch (InterruptedException e) {
         e.printStackTrace();
