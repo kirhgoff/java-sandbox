@@ -1,0 +1,2 @@
+#!/bin/bash
+mvn deploy:deploy-file -DgroupId=com.amazon -DartifactId=athena-jdbc -Dversion=1.0 -Durl=file:./lib/ -DrepositoryId=local-maven-repo -DupdateReleaseInfo=true -Dfile=./lib/AthenaJDBC41-1.0.0.jar
